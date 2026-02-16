@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Player App</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="wrap">
+      <h1>Player App</h1>
+      <p class="muted">Players + Evaluations</p>
+      <div id="dashboard" class="dashboard"></div>
+    </header>
+
+    <main class="wrap grid">
+      <section class="card">
+        <h2>Add Player</h2>
+        <form id="playerForm" class="form">
+          <label>
+            Full name
+            <input name="full_name" placeholder="e.g., Omar Hassan" required />
+          </label>
+          <label>
+            Birthdate
+            <input name="birthdate" type="date" />
+          </label>
+          <label>
+            Position
+            <input name="position" placeholder="e.g., LW, CB, GK" />
+          </label>
+          <button type="submit">Add</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>Players</h2>
+        <div id="players"></div>
+      </section>
+
+      <section class="card">
+        <h2>Selected Player</h2>
+        <div id="selectedPlayer" class="muted">
+          Select a player to view/add evaluations.
+        </div>
+
+        <div id="evalSection" class="hidden">
+          <h3>Add Evaluation</h3>
+          <form id="evalForm" class="form">
+            <label>
+              Evaluator name
+              <input name="evaluator_name" placeholder="e.g., Coach Adham" />
+            </label>
+            <label>
+              Date
+              <input name="date" type="date" required />
+            </label>
+            <label>
+              Score (0–100)
+              <input name="score" type="number" min="0" max="100" />
+            </label>
+            <label>
+              Notes
+              <textarea
+                name="notes"
+                rows="4"
+                placeholder="Key observations, recommendations..."
+              ></textarea>
+            </label>
+            <button type="submit">Save Evaluation</button>
+          </form>
+
+          <h3>Evaluations</h3>
+          <div id="evals"></div>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
