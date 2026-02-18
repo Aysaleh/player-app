@@ -6,7 +6,7 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
-app.get("/api/health", (req, res) => {
+app.get("/api/health", requireAuth, (req, res) => {
   res.json({ ok: true });
 });// ---------- Auth helpers ----------
 function requireAuth(req, res, next) {
