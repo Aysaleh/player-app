@@ -82,7 +82,7 @@ app.get("/api/me", (req, res) => {
   res.json({ authenticated: true, userId: req.session.userId });
 });
 
-app.get("/api/players", (req, res) => {
+app.get("/api/players", requireAuth, (req, res) => {
   db.all(
     `SELECT id, full_name, birthdate, position, created_at FROM players ORDER BY id DESC`,
     [],
@@ -93,7 +93,7 @@ app.get("/api/players", (req, res) => {
   );
 });
 
-app.post("/api/players", (req, res) => {
+app.post("/api/players", requireAuth, (req, res) => {
   const { full_name, birthdate = "", position = "" } = req.body || {};
 
   if (!full_name || !full_name.trim()) {
@@ -120,7 +120,7 @@ app.post("/api/players", (req, res) => {
   );
 });
 
-app.delete("/api/players/:id", (req, res) => {
+app.delete("/api/players/:id", requireAuth, (req, res) => {
   const id = Number(req.params.id);
 
   if (!Number.isFinite(id)) {
