@@ -9,6 +9,18 @@ const cookieParser = require("cookie-parser");
 const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
+app.use(cookieParser());
+
+const JWT_SECRET = process.env.JWT_SECRET || "dev_secret_change_me";
+const COOKIE_NAME = "playerapp_token";
+
+function signToken(user) {
+  return jwt.sign(
+    { id: user.id, email: user.email },
+    JWT_SECRET,
+    { expiresIn: "7d" }
+  );
+}
 
 app.get("/api/health", requireAuth, (req, res) => {
   res.json({ ok: true });
