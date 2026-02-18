@@ -2,12 +2,21 @@ const express = require("express");
 const path = require("path");
 const db = require("./db");
 
+const session = require("express-session");
+
 const bcrypt = require ("bcrypt");
 const jwt = require ("jsonwebtoken");
 const cookieParser = require ("cookie-parser");
 
 const app = express();
 app.use(express.json());
+app.use (
+    session({
+      secret: "super-secret-key",
+      resave: false,
+      saveUninitialized: false,
+    })
+);
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -162,3 +171,4 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
+
