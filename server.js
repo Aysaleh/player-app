@@ -2,8 +2,13 @@ const express = require("express");
 const path = require("path");
 const db = require("./db");
 
+const bcrypt = require ("bcrypt");
+const jwt = require ("jsonwebtoken");
+const cookieParser = require ("cookie-parser");
+
 const app = express();
 app.use(express.json());
+app.use(cookieParser());
 app.use(express.static(path.join(__dirname, "public")));
 
 app.get("/api/health", (req, res) => {
