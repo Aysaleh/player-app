@@ -8,6 +8,78 @@ app.use(express.static(path.join(__dirname, "public")));
 
 app.get("/api/health", (req, res) => {
   res.json({ ok: true });
+});// ---------- Auth helpers ----------
+function requireAuth(req, res, next) {
+  if (!req.session || !req.session.userId) {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
+  next();
+}
+
+// ---------- Auth routes ----------
+app.post("/api/register", async (req, res) => {
+  try {
+    const { email, password } = req.body || {};
+
+    if (!email || !password) {
+      return res.status(400).json({ error: "email and password are required" });
+    }
+    if (String(password).length < 6) {
+      return res.status(400).json({ error: "password must be at least 6 characters" });
+    }
+
+    const hashed = await bcrypt.hash(password, 10);
+    const created_at = new Date().toISOString();
+
+    db.run(
+      `INSERT INTO users (email, password, created_at) VALUES (?, ?, ?)`,
+      [String(email).trim().toLowerCase(), hashed, created_at],
+      function (err) {
+        if (err) {
+          return res.status(400).json({ error: "Email already exists" });
+        }
+        req.session.userId = this.lastID;
+        res.json({ ok: true });
+      }
+    );
+  } catch (e) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.post("/api/login", (req, res) => {
+  const { email, password } = req.body || {};
+
+  if (!email || !password) {
+    return res.status(400).json({ error: "email and password are required" });
+  }
+
+  db.get(
+    `SELECT id, email, password FROM users WHERE email = ?`,
+    [String(email).trim().toLowerCase()],
+    async (err, user) => {
+      if (err) return res.status(500).json({ error: "Server error" });
+      if (!user) return res.status(401).json({ error: "Invalid email or password" });
+
+      const ok = await bcrypt.compare(String(password), user.password);
+      if (!ok) return res.status(401).json({ error: "Invalid email or password" });
+
+      req.session.userId = user.id;
+      res.json({ ok: true });
+    }
+  );
+});
+
+app.post("/api/logout", (req, res) => {
+  if (!req.session) return res.json({ ok: true });
+  req.session.destroy(() => res.json({ ok: true }));
+});
+
+app.get("/api/me", (req, res) => {
+  if (!req.session || !req.session.userId) {
+    return res.json({ authenticated: false });
+  }
+  res.json({ authenticated: true, userId: req.session.userId });
 });
 
 app.get("/api/players", (req, res) => {
