@@ -24,6 +24,101 @@ function signToken(user) {
 
 app.get("/api/health", requireAuth, (req, res) => {
   res.json({ ok: true });
+
+  // ===================== AUTH =====================
+
+function requireAuth(req, res, next) {
+  const token = req.cookies?.[COOKIE_NAME];
+  if (!token) return res.status(401).json({ error: "not logged in" });
+
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    req.user = payload; // {id, email}
+    next();
+  } catch {
+    return res.status(401).json({ error: "invalid token" });
+  }
+}
+
+// POST /api/auth/register
+app.post("/api/auth/register", (req, res) => {
+  const { email = "", password = "" } = req.body || {};
+  const cleanEmail = String(email).trim().toLowerCase();
+
+  if (!cleanEmail || !password) {
+    return res.status(400).json({ error: "email and password are required" });
+  }
+  if (String(password).length < 6) {
+    return res.status(400).json({ error: "password must be at least 6 characters" });
+  }
+
+  const passwordHash = bcrypt.hashSync(String(password), 10);
+  const created_at = new Date().toISOString();
+
+  db.run(
+    `INSERT INTO users (email, password, created_at) VALUES (?, ?, ?)`,
+    [cleanEmail, passwordHash, created_at],
+    function (err) {
+      if (err) {
+        if (String(err.message || "").includes("UNIQUE")) {
+          return res.status(409).json({ error: "email already exists" });
+        }
+        return res.status(500).json({ error: err.message });
+      }
+
+      const token = signToken({ id: this.lastID, email: cleanEmail });
+      res.cookie(COOKIE_NAME, token, { httpOnly: true, sameSite: "lax" });
+
+      return res.json({ ok: true, user: { id: this.lastID, email: cleanEmail } });
+    }
+  );
+});
+
+// POST /api/auth/login
+app.post("/api/auth/login", (req, res) => {
+  const { email = "", password = "" } = req.body || {};
+  const cleanEmail = String(email).trim().toLowerCase();
+
+  if (!cleanEmail || !password) {
+    return res.status(400).json({ error: "email and password are required" });
+  }
+
+  db.get(
+    `SELECT id, email, password FROM users WHERE email = ?`,
+    [cleanEmail],
+    (err, row) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (!row) return res.status(401).json({ error: "invalid credentials" });
+
+      const ok = bcrypt.compareSync(String(password), row.password);
+      if (!ok) return res.status(401).json({ error: "invalid credentials" });
+
+      const token = signToken({ id: row.id, email: row.email });
+      res.cookie(COOKIE_NAME, token, { httpOnly: true, sameSite: "lax" });
+
+      return res.json({ ok: true, user: { id: row.id, email: row.email } });
+    }
+  );
+});
+
+// POST /api/auth/logout
+app.post("/api/auth/logout", (req, res) => {
+  res.clearCookie(COOKIE_NAME);
+  res.json({ ok: true });
+});
+
+// GET /api/auth/me
+app.get("/api/auth/me", (req, res) => {
+  const token = req.cookies?.[COOKIE_NAME];
+  if (!token) return res.status(401).json({ error: "not logged in" });
+
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    return res.json({ ok: true, user: payload });
+  } catch {
+    return res.status(401).json({ error: "invalid token" });
+  }
+});
 });// ---------- Auth helpers ----------
 function requireAuth(req, res, next) {
   if (!req.session || !req.session.userId) {
