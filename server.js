@@ -142,7 +142,7 @@ app.delete("/api/players/:id", requireAuth, (req, res) => {
   });
 });
 
-app.get("/api/players/:id/evaluations", (req, res) => {
+app.get("/api/players/:id/evaluations", requireAuth, (req, res) => {
   const player_id = Number(req.params.id);
 
   if (!Number.isFinite(player_id)) {
@@ -162,7 +162,7 @@ app.get("/api/players/:id/evaluations", (req, res) => {
   );
 });
 
-app.post("/api/players/:id/evaluations", (req, res) => {
+app.post("/api/players/:id/evaluations", requireAuth, (req, res) => {
   const player_id = Number(req.params.id);
 
   if (!Number.isFinite(player_id)) {
