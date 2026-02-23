@@ -1,34 +1,20 @@
-let selectedPlayerId = null;
+let selectedPlayer = null;
 
 async function api(path, opts = {}) {
   const res = await fetch(path, {
     headers: { "Content-Type": "application/json" },
-    ...opts
+    ...opts,
   });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || "Request failed");
+  let data = null;
+  try { data = await res.json(); } catch { data = null; }
+  if (!res.ok) throw new Error((data && data.error) || "Request failed");
   return data;
 }
 
-function el(html) {
-  const t = document.createElement("template");
-  t.innerHTML = html.trim();
-  return t.content.firstChild;
-}
-
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (m) => ({
+function htmlEscape(s) {
+  return String(s ?? "").replace(/[&<>"']/g, (m) => ({
     "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
   }[m]));
-}
-
-async function loadDashboard() {
-  const d = await api("/api/dashboard");
-  const dash = document.getElementById("dashboard");
-  dash.innerHTML = "";
-  dash.appendChild(el(`<span class="pill">Players: ${d.players_count}</span>`));
-  dash.appendChild(el(`<span class="pill">Evaluations: ${d.evals_count}</span>`));
-  dash.appendChild(el(`<span class="pill">Avg score: ${d.avg_score ?? "—"}</span>`));
 }
 
 async function loadPlayers() {
@@ -36,128 +22,195 @@ async function loadPlayers() {
   const container = document.getElementById("players");
   container.innerHTML = "";
 
-  if (players.length === 0) {
-    container.appendChild(el(`<div class="muted">No players yet.</div>`));
+  if (!players.length) {
+    container.innerHTML = "<p>No players yet.</p>";
     return;
   }
 
-  players.forEach(p => {
-    const row = el(`
-      <div class="row">
-        <div>
-          <div><strong>${escapeHtml(p.full_name)}</strong></div>
-          <div class="muted" style="font-size:12px">
-            ${p.position || "—"} • ${p.birthdate || "No DOB"}
-          </div>
-        </div>
-        <div style="display:flex; gap:8px;">
-          <button data-action="select">Select</button>
-          <button class="danger" data-action="delete">Delete</button>
-        </div>
-      </div>
-    `);
-
-    row.querySelector('[data-action="select"]').onclick = () => selectPlayer(p);
-    row.querySelector('[data-action="delete"]').onclick = () => deletePlayer(p.id);
-    container.appendChild(row);
-  });
+  for (const p of players) {
+    const div = document.createElement("div");
+    div.className = "player-row";
+    div.innerHTML = `
+      <button class="select-btn">Select</button>
+      <strong>${htmlEscape(p.full_name)}</strong>
+      <span class="muted">(${htmlEscape(p.position || "—")})</span>
+      <span class="muted">DOB: ${htmlEscape(p.birthdate || "—")}</span>
+      <span class="muted">Created: ${htmlEscape(p.created_at || "")}</span>
+    `;
+    div.querySelector(".select-btn").onclick = () => selectPlayer(p);
+    container.appendChild(div);
+  }
 }
 
-async function selectPlayer(p) {
-  selectedPlayerId = p.id;
-  document.getElementById("selectedPlayer").innerHTML = `
-    <div><strong>${escapeHtml(p.full_name)}</strong></div>
-    <div class="muted" style="font-size:12px">ID: ${p.id}</div>
-  `;
-  document.getElementById("evalSection").classList.remove("hidden");
-  await loadEvaluations();
-}
+async function createPlayer() {
+  const full_name = document.getElementById("full_name").value.trim();
+  const birthdate = document.getElementById("birthdate").value;
+  const position = document.getElementById("position").value.trim();
 
-async function loadEvaluations() {
-  if (!selectedPlayerId) return;
-  const evals = await api(`/api/players/${selectedPlayerId}/evaluations`);
-  const container = document.getElementById("evals");
-  container.innerHTML = "";
-
-  if (evals.length === 0) {
-    container.appendChild(el(`<div class="muted">No evaluations yet.</div>`));
+  if (!full_name) {
+    alert("Full name is required");
     return;
   }
-
-  evals.forEach(e => {
-    container.appendChild(el(`
-      <div class="row">
-        <div>
-          <div>
-            <strong>${e.date}</strong>
-            ${e.score !== null && e.score !== undefined ? `<span class="pill">Score: ${e.score}</span>` : ""}
-          </div>
-          <div class="muted" style="font-size:12px">
-            ${escapeHtml(e.evaluator_name || "Unknown evaluator")}
-          </div>
-          ${e.notes ? `<div style="margin-top:6px">${escapeHtml(e.notes)}</div>` : ""}
-        </div>
-      </div>
-    `));
-  });
-}
-
-async function deletePlayer(id) {
-  if (!confirm("Delete player and all evaluations?")) return;
-
-  await api(`/api/players/${id}`, { method: "DELETE" });
-
-  if (selectedPlayerId === id) {
-    selectedPlayerId = null;
-    document.getElementById("selectedPlayer").textContent =
-      "Select a player to view/add evaluations.";
-    document.getElementById("evalSection").classList.add("hidden");
-  }
-
-  await loadPlayers();
-  await loadDashboard();
-}
-
-document.getElementById("playerForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const form = e.currentTarget;
-  const payload = Object.fromEntries(new FormData(form).entries());
 
   await api("/api/players", {
     method: "POST",
-    body: JSON.stringify(payload)
+    body: JSON.stringify({ full_name, birthdate, position }),
   });
 
-  form.reset();
+  document.getElementById("full_name").value = "";
+  document.getElementById("birthdate").value = "";
+  document.getElementById("position").value = "";
+
   await loadPlayers();
-  await loadDashboard();
-});
+}
 
-document.getElementById("evalForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  if (!selectedPlayerId) return;
+async function selectPlayer(p) {
+  selectedPlayer = p;
+  renderProfile();
+}
 
-  const form = e.currentTarget;
-  const raw = Object.fromEntries(new FormData(form).entries());
+function renderProfile() {
+  const profile = document.getElementById("profile");
+  if (!selectedPlayer) {
+    profile.innerHTML = "<p>Select a player to view profile.</p>";
+    return;
+  }
 
-  const payload = {
-    evaluator_name: raw.evaluator_name || "",
-    date: raw.date,
-    notes: raw.notes || "",
-    score: raw.score === "" ? null : Number(raw.score)
+  const imgPath = selectedPlayer.profile_image ? selectedPlayer.profile_image : "";
+
+  profile.innerHTML = `
+    <div class="profile-card">
+      <div class="profile-left">
+        ${imgPath ? `<img class="avatar" src="${imgPath}" alt="Profile" />` : `<div class="avatar placeholder">No Photo</div>`}
+        <form id="photoForm">
+          <label>Profile Photo</label>
+          <input type="file" id="photoFile" accept="image/*" />
+          <button type="submit">Upload Photo</button>
+        </form>
+      </div>
+
+      <div class="profile-right">
+        <h3>${htmlEscape(selectedPlayer.full_name)}</h3>
+
+        <div class="grid">
+          <label>Bio
+            <textarea id="bio" rows="3">${htmlEscape(selectedPlayer.bio || "")}</textarea>
+          </label>
+
+          <label>Nationality
+            <input id="nationality" value="${htmlEscape(selectedPlayer.nationality || "")}" />
+          </label>
+
+          <label>Dominant Foot
+            <input id="dominant_foot" value="${htmlEscape(selectedPlayer.dominant_foot || "")}" placeholder="Right / Left" />
+          </label>
+
+          <label>Height (cm)
+            <input id="height_cm" type="number" value="${htmlEscape(selectedPlayer.height_cm || "")}" />
+          </label>
+
+          <label>Weight (kg)
+            <input id="weight_kg" type="number" value="${htmlEscape(selectedPlayer.weight_kg || "")}" />
+          </label>
+
+          <label>Club
+            <input id="club" value="${htmlEscape(selectedPlayer.club || "")}" />
+          </label>
+
+          <label>Agent
+            <input id="agent" value="${htmlEscape(selectedPlayer.agent || "")}" />
+          </label>
+
+          <label>Phone
+            <input id="phone" value="${htmlEscape(selectedPlayer.phone || "")}" />
+          </label>
+        </div>
+
+        <button id="saveProfileBtn">Save Profile</button>
+
+        <hr />
+
+        <h4>Player Files</h4>
+        <form id="fileForm">
+          <input type="file" id="attachFile" />
+          <button type="submit">Upload File</button>
+        </form>
+
+        <div id="filesList" class="muted">Files list will be added next step.</div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById("saveProfileBtn").onclick = saveProfile;
+
+  document.getElementById("photoForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const f = document.getElementById("photoFile").files[0];
+    if (!f) return alert("Choose a photo first.");
+
+    const fd = new FormData();
+    fd.append("profile", f);
+
+    const res = await fetch(`/api/players/${selectedPlayer.id}/profile-image`, { method: "POST", body: fd });
+    if (!res.ok) {
+      const t = await res.text();
+      alert("Upload failed: " + t);
+      return;
+    }
+    await refreshSelectedPlayer();
   };
 
-  await api(`/api/players/${selectedPlayerId}/evaluations`, {
-    method: "POST",
-    body: JSON.stringify(payload)
+  document.getElementById("fileForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const f = document.getElementById("attachFile").files[0];
+    if (!f) return alert("Choose a file first.");
+
+    const fd = new FormData();
+    fd.append("file", f);
+
+    const res = await fetch(`/api/players/${selectedPlayer.id}/files`, { method: "POST", body: fd });
+    if (!res.ok) {
+      const t = await res.text();
+      alert("Upload failed: " + t);
+      return;
+    }
+    alert("Uploaded!");
+  };
+}
+
+async function saveProfile() {
+  const payload = {
+    full_name: selectedPlayer.full_name,
+    birthdate: selectedPlayer.birthdate,
+    position: selectedPlayer.position,
+    bio: document.getElementById("bio").value,
+    nationality: document.getElementById("nationality").value,
+    dominant_foot: document.getElementById("dominant_foot").value,
+    height_cm: document.getElementById("height_cm").value ? Number(document.getElementById("height_cm").value) : null,
+    weight_kg: document.getElementById("weight_kg").value ? Number(document.getElementById("weight_kg").value) : null,
+    club: document.getElementById("club").value,
+    agent: document.getElementById("agent").value,
+    phone: document.getElementById("phone").value,
+  };
+
+  await api(`/api/players/${selectedPlayer.id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
   });
 
-  form.reset();
-  await loadEvaluations();
-  await loadDashboard();
-});
+  await refreshSelectedPlayer();
+  alert("Saved!");
+}
 
+async function refreshSelectedPlayer() {
+  const players = await api("/api/players");
+  const fresh = players.find((x) => x.id === selectedPlayer.id);
+  if (fresh) selectedPlayer = fresh;
+  renderProfile();
+}
+
+// Init
 (async function init() {
-  await loadDashboard();
   await loadPlayers();
+  renderProfile();
 })();
