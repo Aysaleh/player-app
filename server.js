@@ -2,6 +2,9 @@ const express = require("express");
 const path = require("path");
 const db = require("./db");
 
+const fs = require("fs");
+const multer = require("multer");
+
 const session = require("express-session");
 
 const bcrypt = require ("bcrypt");
@@ -19,6 +22,24 @@ app.use (
 );
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, "public")));
+
+// ---------- Uploads setup ----------
+const UPLOADS_DIR = path.join(__dirname, "uploads");
+if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+
+// Serve uploaded files
+app.use("/uploads", express.static(UPLOADS_DIR));
+
+// Multer storage
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, UPLOADS_DIR),
+  filename: (req, file, cb) => {
+    const safeOriginal = String(file.originalname || "file").replace(/[^\w.\-]+/g, "_");
+    cb(null, `${Date.now()}_${Math.random().toString(16).slice(2)}_${safeOriginal}`);
+  },
+});
+
+const upload = multer({ storage });
 
 app.get("/api/health", (req, res) => {
   res.json({ ok: true });
@@ -171,4 +192,3 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
-
