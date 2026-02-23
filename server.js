@@ -83,6 +83,33 @@ app.post("/api/players", (req, res) => {
   );
 });
 
+// Upload attachment for player
+app.post("/api/players/:id/files", upload.single("file"), (req, res) => {
+  const { id } = req.params;
+
+  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+  db.run(
+    `
+    INSERT INTO player_files 
+    (player_id, file_path, original_name, mime_type, size, uploaded_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+    `,
+    [
+      id,
+      `/uploads/${req.file.filename}`,
+      req.file.originalname,
+      req.file.mimetype,
+      req.file.size,
+      new Date().toISOString()
+    ],
+    function (err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ success: true });
+    }
+  );
+});
+
 app.delete("/api/players/:id", (req, res) => {
   const id = Number(req.params.id);
 
