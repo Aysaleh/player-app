@@ -25,6 +25,42 @@ db.serialize(() => {
     )
   `);
 
+  // --- Extra player profile fields (safe to run multiple times) ---
+db.serialize(() => {
+  // Add extra profile columns to players
+  const extraColumns = [
+    "profile_image TEXT",      // stored path like /uploads/xxx.jpg
+    "bio TEXT",
+    "nationality TEXT",
+    "dominant_foot TEXT",
+    "height_cm INTEGER",
+    "weight_kg INTEGER",
+    "club TEXT",
+    "agent TEXT",
+    "phone TEXT"
+  ];
+
+  extraColumns.forEach((colDef) => {
+    db.run(`ALTER TABLE players ADD COLUMN ${colDef}`, (err) => {
+      // Ignore error if column already exists
+    });
+  });
+
+  // Table to store uploaded files per player
+  db.run(`
+    CREATE TABLE IF NOT EXISTS player_files (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      player_id INTEGER NOT NULL,
+      file_path TEXT NOT NULL,         -- e.g. /uploads/1700000000-abc.pdf
+      original_name TEXT NOT NULL,
+      mime_type TEXT,
+      size INTEGER,
+      uploaded_at TEXT NOT NULL,
+      FOREIGN KEY (player_id) REFERENCES players(id)
+    )
+  `);
+});
+
   db.run(`
     CREATE TABLE IF NOT EXISTS evaluations (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
